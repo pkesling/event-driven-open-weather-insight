@@ -1,0 +1,14 @@
+version: 2
+
+models:
+  - name: stg_airnow_air_quality_forecast
+    columns:
+      - name: aqi_clean
+        tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 500
+      - name: is_valid
+        tests:
+          - accepted_values:
+              values: [true, false]

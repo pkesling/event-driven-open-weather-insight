@@ -1,0 +1,265 @@
+networks:
+  de-net:
+    name: de-net  # explicitly define the network name so the bike agent can connect to it
+
+volumes:
+  pg_warehouse_data:
+  pg_airflow_data:
+  airflow_logs:
+
+# common airflow config to use as a template
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.9.3-python3.12
+  env_file: [ .env ]
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_WEBSERVER_SECRET_KEY}
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: ${AIRFLOW_DB_DIALECT}://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@${AIRFLOW_DB_HOST}:${AIRFLOW_DB_PORT}/${AIRFLOW_DB_DB}
+    AIRFLOW__CORE__DAGS_FOLDER: /opt/app/src/weather_insight/dags
+    PYTHONPATH: /opt/app/src
+    _PIP_ADDITIONAL_REQUIREMENTS: >
+      confluent-kafka==2.3.0 psycopg2-binary==2.9.9
+
+    # UI bootstrap (used by airflow-init)
+    _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_WWW_USER_USERNAME}
+    _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_WWW_USER_PASSWORD}
+
+    # Shared app config passed via env
+    KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
+    KAFKA_SECURITY_PROTOCOL: ${KAFKA_SECURITY_PROTOCOL}
+    KAFKA_TOPIC_OPENAQ: ${KAFKA_TOPIC_OPENAQ}
+    KAFKA_TOPIC_OPENAQ_DLT: ${KAFKA_TOPIC_OPENAQ_DLT}
+    WAREHOUSE_DB_DSN: ${WAREHOUSE_DB_DIALECT}://${WAREHOUSE_DB_USER}:${WAREHOUSE_DB_PASSWORD}@${WAREHOUSE_DB_HOST}:${WAREHOUSE_DB_PORT}/${WAREHOUSE_DB_DB}
+    WAREHOUSE_DB_HOST: ${WAREHOUSE_DB_HOST}
+    WAREHOUSE_DB_PORT: ${WAREHOUSE_DB_PORT}
+    WAREHOUSE_DB_DB: ${WAREHOUSE_DB_DB}
+    WAREHOUSE_DB_USER: ${WAREHOUSE_DB_USER}
+    WAREHOUSE_DB_PASSWORD: ${WAREHOUSE_DB_PASSWORD}
+    OPENAQ_LATEST_MEASURES_EVENT_TYPE: ${OPENAQ_LATEST_MEASURES_EVENT_TYPE}
+  user: "50000:0"
+  volumes:
+    - ./src:/opt/app/src
+    - airflow_logs:/opt/airflow/logs
+  depends_on:
+    postgres-airflow:
+      condition: service_healthy
+    kafka:
+      condition: service_healthy
+  networks: [ de-net ]
+
+services:
+  # Data warehouse postgres service instance
+  postgres-warehouse:
+    image: postgres:16
+    container_name: postgres-warehouse
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${WAREHOUSE_DB_USER}
+      POSTGRES_PASSWORD: ${WAREHOUSE_DB_PASSWORD}
+      POSTGRES_DB: ${WAREHOUSE_DB_DB}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${WAREHOUSE_DB_USER} -d ${WAREHOUSE_DB_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports: ["5432:5432"]
+    volumes:
+      - pg_warehouse_data:/var/lib/postgresql/data
+    networks: [de-net]
+
+  # Airflow application database postgres service instance
+  postgres-airflow:
+    image: postgres:16
+    container_name: postgres-airflow
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${AIRFLOW_DB_USER}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD}
+      POSTGRES_DB: ${AIRFLOW_DB_DB}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AIRFLOW_DB_USER} -d ${AIRFLOW_DB_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports: ["5433:5432"]
+    volumes:
+      - pg_airflow_data:/var/lib/postgresql/data
+    networks: [de-net]
+
+  # Kafka service instance
+  kafka:
+    image: apache/kafka:4.0.1
+    container_name: kafka
+    # WARNING: PLAINTEXT + auto-topic-create is for local/demo only.
+    # Enable TLS/SASL and disable auto-create topics in any non-demo environment.
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    ports: ["9092:9092"]
+    networks: [de-net]
+
+  # Kafka UI
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports: ["9000:8080"]
+    networks: [de-net]
+
+  # One-shot Airflow DB initializer
+  airflow-init:
+    <<: *airflow-common
+    container_name: airflow-init
+    command: >
+      bash -c "
+      airflow db migrate &&
+      airflow db check &&
+      airflow users create --role Admin --username \"$$_AIRFLOW_WWW_USER_USERNAME\" --password \"$$_AIRFLOW_WWW_USER_PASSWORD\" --firstname Admin --lastname User --email admin@example.com || true &&
+      echo 'Airflow DB initialized'
+      "
+    # Don't restart; it's meant to run once and exit
+    restart: "no"
+
+  # Airflow webserver (just runs the webserver now)
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: airflow-webserver
+    entrypoint: ["bash", "/opt/app/src/weather_insight/scripts/entrypoint-airflow-webserver.sh"]
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    ports: ["8080:8080"]
+#    volumes:
+#      - ./src/weather_insight/scripts:/opt/app/src/weather_insight/scripts
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Airflow scheduler
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: airflow-scheduler
+    command: bash -lc "airflow scheduler"
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  # Airflow triggerer
+  airflow-triggerer:
+    <<: *airflow-common
+    container_name: airflow-triggerer
+    command: bash -lc "airflow triggerer"
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  # OpenAQ Postgres sink (SQLAlchemy 2.x) service
+  openaq-sink:
+    image: python:3.12-slim
+    container_name: openaq-sink
+    env_file: [.env]
+    environment:
+      PYTHONUNBUFFERED: "1"
+    working_dir: /opt/app/src
+    command: >
+      bash -lc "
+        pip install --no-cache-dir 'SQLAlchemy>=2.0,<2.1' psycopg2-binary==2.9.9 confluent-kafka==2.3.0 requests==2.32.3 &&
+        python -m weather_insight.sinks.openaq_postgres_sink
+      "
+    volumes:
+      - ./src:/opt/app/src
+    depends_on:
+      postgres-warehouse:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks: [de-net]
+
+  # Weather.gov Postgres sink (SQLAlchemy 2.x) service
+  weather-sink:
+    image: python:3.12-slim
+    container_name: weather-sink
+    env_file: [.env]
+    environment:
+      PYTHONUNBUFFERED: "1"
+    working_dir: /opt/app/src
+    command: >
+      bash -lc "
+        pip install --no-cache-dir 'SQLAlchemy>=2.0,<2.1' psycopg2-binary==2.9.9 confluent-kafka==2.3.0 requests==2.32.3 &&
+        python -m weather_insight.sinks.weather_postgres_sink
+      "
+    volumes:
+      - ./src:/opt/app/src
+    depends_on:
+      postgres-warehouse:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks: [de-net]
+
+  # Open-Meteo Postgres sink (SQLAlchemy 2.x) service
+  open-meteo-sink:
+    image: python:3.12-slim
+    container_name: open-meteo-sink
+    env_file: [.env]
+    environment:
+      PYTHONUNBUFFERED: "1"
+    working_dir: /opt/app/src
+    command: >
+      bash -lc "
+        pip install --no-cache-dir 'SQLAlchemy>=2.0,<2.1' psycopg2-binary==2.9.9 confluent-kafka==2.3.0 requests==2.32.3 &&
+        python -m weather_insight.sinks.open_meteo_sink
+      "
+    volumes:
+      - ./src:/opt/app/src
+    depends_on:
+      postgres-warehouse:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks: [de-net]
+
+  # airnow.org Postgres sink (SQLAlchemy 2.x) service
+  airnow-sink:
+    image: python:3.12-slim
+    container_name: airnow-sink
+    env_file: [.env]
+    environment:
+      PYTHONUNBUFFERED: "1"
+    working_dir: /opt/app/src
+    command: >
+      bash -lc "
+        pip install --no-cache-dir 'SQLAlchemy>=2.0,<2.1' psycopg2-binary==2.9.9 confluent-kafka==2.3.0 requests==2.32.3 &&
+        python -m weather_insight.sinks.airnow_postgres_sink
+      "
+    volumes:
+      - ./src:/opt/app/src
+    depends_on:
+      postgres-warehouse:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks: [de-net]

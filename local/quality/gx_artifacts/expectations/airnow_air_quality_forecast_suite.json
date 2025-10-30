@@ -1,0 +1,9 @@
+{
+  "expectations": [],
+  "id": "2377cd3b-81fc-4efa-a06a-bcd81c1356f0",
+  "meta": {
+    "great_expectations_version": "1.9.0"
+  },
+  "name": "airnow_air_quality_forecast_suite",
+  "notes": null
+}

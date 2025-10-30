@@ -1,0 +1,9 @@
+version: 2
+
+models:
+  - name: fct_openaq_latest_by_location
+    columns:
+      - name: measurement_value
+        tests:
+          - accepted_range:
+              min_value: 0

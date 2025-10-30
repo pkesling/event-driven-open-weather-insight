@@ -1,0 +1,28 @@
+[project]
+name = "event-driven-open-weather-insight"
+version = "0.1.0"
+description = "A demonstration of modern data engineering stack, this project reads open weather data, enriches it, and makes it available to AI agents to answer questions."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "confluent-kafka==2.3.0",
+    "requests==2.32.5",
+    "psycopg2-binary==2.9.9",
+    "apache-airflow==2.9.3",
+    "great-expectations==1.9.0",
+    "pydantic>=2.12.4",
+    "fastapi>=0.122.0",
+    "uvicorn>=0.38.0",
+    "pydantic-settings>=2.12.0",
+    "git-filter-repo>=2.47.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0.1",
+]
+
+[dependency-groups]
+dev = [
+    "deptry>=0.24.0",
+    "pytest>=9.0.1",
+]

@@ -1,0 +1,34 @@
+name: "openaq_dbt"
+version: "1.0.0"
+config-version: 2
+
+profile: "openaq"
+
+model-paths: ["models/marts", "models/staging", "models/reference"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+clean-targets: ["target", "dbt_packages"]
+
+# Where dbt will put compiled artifacts and logs (relative to this dir)
+target-path: "target"
+log-path: "logs"
+
+models:
+  openaq_dbt:
+    +schema: "stg"
+    staging:
+      +materialized: "view"
+    reference:
+      +materialized: "view"
+    marts:
+      +schema: "mart"
+      +materialized: "view"
+      air_quality:
+        +materialized: "view"
+      weather_forecast:
+        +materialized: "view"
+      open_meteo:
+        +materialized: "view"

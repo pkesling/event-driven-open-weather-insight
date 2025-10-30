@@ -1,0 +1,9 @@
+{
+  "expectations": [],
+  "id": "78fbd482-7898-44f6-bebc-d9aefafc8b35",
+  "meta": {
+    "great_expectations_version": "1.9.0"
+  },
+  "name": "openaq_measurements_by_location_suite",
+  "notes": null
+}

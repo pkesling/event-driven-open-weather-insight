@@ -1,0 +1,9 @@
+{
+  "expectations": [],
+  "id": "1fae1160-7163-4c22-a26f-4b7ff27a0c68",
+  "meta": {
+    "great_expectations_version": "1.9.0"
+  },
+  "name": "stg_weather_hourly_forecast_suite",
+  "notes": null
+}

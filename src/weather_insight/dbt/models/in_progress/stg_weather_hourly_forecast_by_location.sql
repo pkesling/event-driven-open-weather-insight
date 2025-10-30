@@ -1,0 +1,47 @@
+-- models/staging/stg_weather_hourly_forecast.sql
+-- models the stg.weather_hourly_forecast table in the warehouse
+{{  config(
+        materialized='view'
+) }}
+
+SELECT event_id,
+       event_type,
+       source,
+       office,
+       grid_id,
+       grid_x,
+       grid_y,
+       start_time,
+       end_time,
+       is_daytime,
+       temperature,
+       temperature_min,
+       temperature_max,
+       temperature_unit,
+       temperature_trend,
+       relative_humidity,
+       relative_humidity_min,
+       relative_humidity_max,
+       relative_humidity_unit,
+       dewpoint,
+       dewpoint_min,
+       dewpoint_max,
+       dewpoint_unit,
+       wind_speed,
+       wind_speed_min,
+       wind_speed_max,
+       wind_speed_unit,
+       wind_direction,
+       wind_gust,
+       wind_gust_min,
+       wind_gust_max,
+       wind_gust_unit,
+       probability_of_precipitation,
+       probability_of_precipitation_min,
+       probability_of_precipitation_max,
+       probability_of_precipitation_unit,
+       short_forecast,
+       detailed_forecast,
+       ingested_at,
+       last_updated_at
+  FROM stg.weather_hourly_forecast

@@ -1,0 +1,18 @@
+version: 2
+
+models:
+  - name: stg_openaq_measurements_by_location
+    tests:
+      - unique:
+          column_name: event_id
+      - not_null:
+          column_name: event_id
+    columns:
+      - name: value_clean
+        tests:
+          - accepted_range:
+              min_value: 0
+      - name: is_valid
+        tests:
+          - accepted_values:
+              values: [true, false]

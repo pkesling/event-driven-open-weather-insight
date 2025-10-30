@@ -1,0 +1,9 @@
+/src/weather_insight/dbt/target/
+/src/weather_insight/dbt/logs/
+/src/scripts/
+/src/biking_weather_agent/
+/src/.env
+/src/.env.*
+!/src/.env.example
+/.idea
+
