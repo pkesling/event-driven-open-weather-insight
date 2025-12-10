@@ -7,3 +7,5 @@
 !/src/.env.example
 /.idea
 
+.env
+.idea/
