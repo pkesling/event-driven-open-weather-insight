@@ -175,6 +175,7 @@ Services started:
 - PostgreSQL Airflow application DB (`postgres-airflow`)
 - Kafka Broker (`kafka`)
 - Kafka UI (`kafka-ui`)
+- HTTPS reverse proxy (`caddy`) terminating TLS for the local UIs
 - Airflow
   - `airflow-init` (idempotent initialization service that creates the `airflow` DB, if needed)
   - `airflow-webserver`  
@@ -185,6 +186,25 @@ Services started:
   - `airnow-sink`
   - `weather-sink`
   - `open-meteo-sink`
+
+### HTTPS for local UIs (Airflow, Kafka UI)
+- A lightweight Caddy reverse proxy now terminates TLS locally and proxies to `airflow-webserver:8080` and `kafka-ui:8080`.
+- Caddy config lives at `infra/caddy/Caddyfile` (checked in).
+- Browse the secure endpoints at `https://airflow.localhost` and `https://kafka-ui.localhost` after `docker-compose up --build`.
+- Caddy uses its own internal CA; to eliminate browser warnings, trust the CA cert on your host:
+  ```bash
+  # Export the CA cert from the running container
+  mkdir -p ./local/certs
+  docker cp caddy:/data/caddy/pki/authorities/local/root.crt ./local/certs/root.crt
+
+  # macOS (creates a trusted certificate in System keychain; requires sudo GUI prompt)
+  sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ./local/certs/root.crt
+
+  # Linux (example for Debian/Ubuntu)
+  sudo cp ./local/certs/root.crt /usr/local/share/ca-certificates/caddy-local.crt
+  sudo update-ca-certificates
+  ```
+- The original HTTP ports (`8080` for Airflow, `9000` for Kafka UI) remain exposed for convenience; prefer the HTTPS endpoints when possible.
 
 ## BikeAgent integration (warehouse-backed Open-Meteo feed)
 - Airflow DAG `open_meteo_ingest` pulls Open-Meteo weather + air quality for `HOME_LAT`/`HOME_LON` and publishes to Kafka topic `raw.open_meteo.weather_record`.
@@ -200,12 +220,6 @@ Services started:
   ```
   Rows include both weather and air-quality values (with units) ordered by start time so the agent can hydrate its local models without hitting external APIs.
 
-
-Visit Airflow:  
-`http://localhost:8080`
-
-Visit Kafka UI:  
-`http://localhost:9000`
 
 ## 4. Run ingestion DAGs
 

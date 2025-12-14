@@ -1,0 +1,14 @@
+{
+	# Force internal certificates for all sites (no external ACME calls)
+	local_certs
+}
+
+airflow.localhost {
+	tls internal
+	reverse_proxy airflow-webserver:8080
+}
+
+kafka-ui.localhost {
+	tls internal
+	reverse_proxy kafka-ui:8080
+}
