@@ -6,6 +6,7 @@ volumes:
   pg_warehouse_data:
   pg_airflow_data:
   airflow_logs:
+  caddy_data:
 
 # common airflow config to use as a template
 x-airflow-common: &airflow-common
@@ -124,6 +125,21 @@ services:
       kafka:
         condition: service_healthy
     ports: ["9000:8080"]
+    networks: [de-net]
+
+  # HTTPS reverse proxy for local UIs (Caddy with internal CA)
+  caddy:
+    image: caddy:2.8
+    container_name: caddy
+    depends_on:
+      airflow-webserver:
+        condition: service_started
+      kafka-ui:
+        condition: service_started
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    ports: ["443:443", "80:80"]
     networks: [de-net]
 
   # One-shot Airflow DB initializer
