@@ -39,7 +39,7 @@ def test_dbt_transform_core_dag_structure():
     dag_module = importlib.import_module("weather_insight.dags.dbt_transform_core_dag")
     dag = dag_module.dbt_transform_core()
     assert dag.dag_id == "dbt_transform_core"
-    assert len(dag.tasks) == 1
+    assert len(dag.tasks) == 2
 
 
 def test_openaq_fetch_task_uses_client(monkeypatch):

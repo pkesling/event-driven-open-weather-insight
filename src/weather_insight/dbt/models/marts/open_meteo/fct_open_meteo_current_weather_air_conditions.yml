@@ -1,0 +1,21 @@
+version: 2
+
+models:
+  - name: fct_open_meteo_current_weather_air_conditions
+    description: Current merged weather and air quality snapshot from Open-Meteo.
+    tests:
+      - elementary.volume_anomalies
+    columns:
+      - name: temperature
+        tests:
+          - accepted_range:
+              min_value: -150
+              max_value: 150
+      - name: pm2_5
+        tests:
+          - accepted_range:
+              min_value: 0
+      - name: us_aqi
+        tests:
+          - accepted_range:
+              min_value: 0

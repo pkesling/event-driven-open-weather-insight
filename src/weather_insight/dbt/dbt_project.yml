@@ -17,6 +17,11 @@ target-path: "target"
 log-path: "logs"
 
 models:
+  # Elementary metadata models; keep in a dedicated schema (overrides env/default)
+  elementary:
+    +schema: "elementary"
+    # enabled: "{{ target.name in ['prod','analytics'] }}"
+
   openaq_dbt:
     +schema: "stg"
     staging:
