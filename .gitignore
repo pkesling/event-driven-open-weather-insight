@@ -6,6 +6,7 @@
 /src/.env.*
 !/src/.env.example
 /.idea
-
 .env
 .idea/
+/src/weather_insight/dbt/dbt_packages/
+/local/

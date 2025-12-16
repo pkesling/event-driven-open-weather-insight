@@ -2,6 +2,9 @@ version: 2
 
 models:
   - name: fct_openaq_latest_by_location
+    description: Latest validated OpenAQ measurements by location and sensor.
+    tests:
+      - elementary.volume_anomalies
     columns:
       - name: measurement_value
         tests:

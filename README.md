@@ -273,12 +273,21 @@ Your DAG should:
 ### 3. Define SQLAlchemy models  
 Add new ORM models in `src/weather_insight/db/models/your_source.py`.
 
-Use the same pattern as OpenAQ & Weather:
+Use the same SCD-2 pattern as OpenAQ & Weather:
 
 - surrogate key (`*_id_sk`)
-- original source ID
-- SCD-2 columns (`effective_start_at_dtz`, etc.)
-- unique constraint on `(source_id, is_current)`
+- original source ID (business key)
+- SCD-2 columns (`effective_start_at_dtz`, `effective_end_at_dtz`, `is_current`)
+- unique constraint on `(business_key, effective_start_at_dtz)` for versioning
+- partial unique index enforcing a single current row per business key (`WHERE is_current = true`)
+
+When running dbt locally, install packages (Elementary is installed via `packages.yml`):
+
+```
+cd src/weather_insight/dbt
+dbt deps
+dbt build --target docker
+```
 
 ### 4. Add "ops" functions  
 Add `ensure_*` functions in `src/weather_insight/db/ops_your_source.py`.
@@ -346,3 +355,4 @@ PYTHONPATH=src python3 -m pytest tests/your_source
   - Kafka lag
   - warehouse row counts
   - ingestion latency
+- Persist dbt/Elementary data in the database for more advanced anomaly detection.

@@ -11,6 +11,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     Text,
@@ -26,10 +27,6 @@ from weather_insight.db.utils import utcnow
 class DimOpenAQLocation(Base):
     """Current-location dimension rows for OpenAQ sites."""
     __tablename__ = "dim_openaq_locations"
-    __table_args__ = (
-        UniqueConstraint("openaq_locations_id", "is_current", name="uq_location_current"),
-        {"schema": "ref"},
-    )
 
     locations_id_sk: Mapped[int] = Column(BigInteger, primary_key=True)
     openaq_locations_id: Mapped[int] = Column(Integer, nullable=False)
@@ -53,6 +50,22 @@ class DimOpenAQLocation(Base):
     effective_end_at_dtz: Mapped[Optional[datetime]] = Column(DateTime(timezone=True))
     is_current: Mapped[bool] = Column(Boolean, default=True, nullable=False)
 
+    __table_args__ = (
+        UniqueConstraint(
+            "openaq_locations_id",
+            "effective_start_at_dtz",
+            name="uq_location_version",
+        ),
+        # partial unique index - only one current record per location
+        Index(
+            "uq_location_current_true",
+            "openaq_locations_id",
+            unique=True,
+            postgresql_where=is_current.is_(True),
+        ),
+        {"schema": "ref"},
+    )
+
     licenses: Mapped[list["OpenAQLocationLicenseBridge"]] = relationship(
         "OpenAQLocationLicenseBridge",
         back_populates="location",
@@ -63,10 +76,6 @@ class DimOpenAQLocation(Base):
 class DimOpenAQSensor(Base):
     """Current sensor dimension rows tied to OpenAQ locations."""
     __tablename__ = "dim_openaq_sensors"
-    __table_args__ = (
-        UniqueConstraint("openaq_sensors_id", "is_current", name="uq_sensor_current"),
-        {"schema": "ref"},
-    )
 
     sensors_id_sk: Mapped[int] = Column(BigInteger, primary_key=True)
     openaq_sensors_id: Mapped[int] = Column(Integer, nullable=False)
@@ -86,14 +95,26 @@ class DimOpenAQSensor(Base):
     effective_end_at_dtz: Mapped[Optional[datetime]] = Column(DateTime(timezone=True))
     is_current: Mapped[bool] = Column(Boolean, default=True, nullable=False)
 
+    __table_args__ = (
+        UniqueConstraint(
+            "openaq_sensors_id",
+            "effective_start_at_dtz",
+            name="uq_sensor_version",
+        ),
+        # partial unique index - only one current record per location
+        Index(
+            "uq_sensor_current_true",
+            "openaq_sensors_id",
+            unique=True,
+            postgresql_where=is_current.is_(True),
+        ),
+        {"schema": "ref"},
+    )
+
 
 class DimOpenAQLicense(Base):
     """License dimension rows describing OpenAQ data usage terms."""
     __tablename__ = "dim_openaq_licenses"
-    __table_args__ = (
-        UniqueConstraint("openaq_license_id", "is_current", name="uq_license_current"),
-        {"schema": "ref"},
-    )
 
     license_id_sk: Mapped[int] = Column(BigInteger, primary_key=True)
     openaq_license_id: Mapped[int] = Column(Integer, nullable=False)
@@ -113,6 +134,22 @@ class DimOpenAQLicense(Base):
     effective_end_at_dtz: Mapped[Optional[datetime]] = Column(DateTime(timezone=True))
     is_current: Mapped[bool] = Column(Boolean, default=True, nullable=False)
 
+    __table_args__ = (
+        UniqueConstraint(
+            "openaq_license_id",
+            "effective_start_at_dtz",
+            name="uq_license_version",
+        ),
+        # partial unique index - only one current record per location
+        Index(
+            "uq_license_current_true",
+            "openaq_license_id",
+            unique=True,
+            postgresql_where=is_current.is_(True),
+        ),
+        {"schema": "ref"},
+    )
+
     locations: Mapped[list["OpenAQLocationLicenseBridge"]] = relationship(
         "OpenAQLocationLicenseBridge",
         back_populates="license",
@@ -123,10 +160,6 @@ class DimOpenAQLicense(Base):
 class OpenAQLocationLicenseBridge(Base):
     """Bridge table linking locations and licenses with SCD-2 semantics."""
     __tablename__ = "openaq_locations_license_bridge"
-    __table_args__ = (
-        UniqueConstraint("locations_id_sk", "license_id_sk", "is_current", name="uq_loc_lic_current"),
-        {"schema": "ref"},
-    )
 
     bridge_id: Mapped[int] = Column(BigInteger, primary_key=True)
     locations_id_sk: Mapped[int] = Column(
@@ -152,6 +185,24 @@ class OpenAQLocationLicenseBridge(Base):
     )
     license: Mapped["DimOpenAQLicense"] = relationship(
         "DimOpenAQLicense", back_populates="locations"
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "locations_id_sk",
+            "license_id_sk",
+            "effective_start_at_dtz",
+            name="uq_loc_lic_version",
+        ),
+        # partial unique index - only one current record per location/license
+        Index(
+            "uq_loc_lic_current_true",
+            "locations_id_sk",
+            "license_id_sk",
+            unique=True,
+            postgresql_where=is_current.is_(True),
+        ),
+        {"schema": "ref"},
     )
 
 

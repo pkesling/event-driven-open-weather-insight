@@ -2,6 +2,9 @@ version: 2
 
 models:
   - name: fct_air_weather_forecast
+    description: Joined AirNow air quality forecasts with NWS hourly weather + latest OpenAQ measurements.
+    tests:
+      - elementary.volume_anomalies
     columns:
       - name: latest_measured_pm25
         tests:
